@@ -53,6 +53,8 @@ public class PlotVisualizer extends JPanel {
 	
 	private int area_around_mouse = 0;
 	
+	private boolean show_axis = false;
+	
 	private final TransformerAndCallback trans;
 	
 	private int nwidth = 1, nheight = 1;
@@ -139,6 +141,67 @@ public class PlotVisualizer extends JPanel {
 	public void setAreaAroundMouse(int area) {
 		if (area >= 0)
 			area_around_mouse = area;
+	}
+	
+	/**
+	 * Enables/disables the horizontal (value) axis with tick labels
+	 * along the bottom edge of the plot. Labels are produced by the
+	 * transformer's getDescription() (for the spectrum this is MHz).
+	 */
+	public void setShowAxis(boolean show) {
+		this.show_axis = show;
+		repaint();
+	}
+	
+	/**
+	 * Draws the horizontal frequency (value) axis at the bottom of the plot.
+	 * The tick labels adapt to the visible zoom/pan range.
+	 */
+	private void paintAxis(Graphics g) {
+		final int axis_h = 2*half_fontsize + 6;
+		
+		final int first_id = Math.max(0, Math.min(size-1, (int) Math.floor(scale_x.pixels_to_value_absolute(0))));
+		final int last_id  = Math.max(0, Math.min(size-1, (int) Math.ceil(scale_x.pixels_to_value_absolute(nwidth))));
+		if (last_id < first_id) return;
+		
+		final double v0 = trans.fromIndex(first_id, offset, samplerate);
+		final double v1 = trans.fromIndex(last_id, offset, samplerate);
+		final double vmin = Math.min(v0, v1);
+		final double vmax = Math.max(v0, v1);
+		final double range = vmax - vmin;
+		if (!(range > 0) || Double.isInfinite(range) || Double.isNaN(range)) return;
+		
+		final double[] steps = {0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000};
+		double step = steps[steps.length-1];
+		for (final double s : steps) if (range / s <= 10) { step = s; break; }
+		
+		// number of decimal places for the tick labels (values are in MHz for the spectrum axis)
+		final int decimals = (step >= 1) ? 0 : (step >= 0.1) ? 1 : (step >= 0.01) ? 2 : 3;
+		
+		final double first_tick = Math.ceil(vmin / step) * step;
+		final int y_base = nheight - axis_h;
+		
+		g.setColor(Color.black);
+		g.fillRect(0, y_base, nwidth, axis_h);
+		g.setColor(default_txt_colour_background);
+		g.drawLine(0, y_base, nwidth, y_base);
+		
+		int previous_label_right = Integer.MIN_VALUE;
+		for (double val = first_tick; val <= vmax + step*0.001; val += step) {
+			final int id = trans.toIndex(val, offset, samplerate);
+			if (id < 0 || id >= size) continue;
+			final int x = scale_x.value_to_pixel_absolute(id);
+			if (x < 0 || x > nwidth) continue;
+			
+			g.drawLine(x, y_base, x, nheight);
+			
+			final String label = String.format("%."+decimals+"f MHz", val);
+			final int labelwidth = g.getFontMetrics().stringWidth(label);
+			final int labelx = x - labelwidth/2;
+			if (labelx < previous_label_right) continue;
+			g.drawString(label, labelx, y_base + half_fontsize + 2);
+			previous_label_right = labelx + labelwidth + 6;
+		}
 	}
 	
 	private int getBestIdAround(final int px, final int area_px) {
@@ -411,6 +474,8 @@ public class PlotVisualizer extends JPanel {
 			}
 			
 			scale_y.paintScale(g);
+			
+			if (show_axis) paintAxis(g);
 		}
 	}
 	

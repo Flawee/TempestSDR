@@ -53,6 +53,8 @@ import javax.swing.SwingConstants;
 import javax.swing.event.ChangeListener;
 import javax.swing.event.ChangeEvent;
 
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.FocusAdapter;
@@ -64,6 +66,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.prefs.Preferences;
 
 import javax.swing.JPanel;
@@ -108,6 +111,11 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 	private JFrame frmTempestSdr;
 	private JFrame fullscreenframe;
 	private JDialog deviceframe;
+	private boolean inFullscreen;
+	private Rectangle savedFrameBounds;
+	private Rectangle normalFrameBounds;
+	private final Map<Component, Rectangle> savedComponentBounds = new HashMap<Component, Rectangle>();
+	private JCheckBoxMenuItem fullscreen_menuitem;
 	private JSpinner spWidth;
 	private JSpinner spHeight;
 	@SuppressWarnings("rawtypes")
@@ -204,7 +212,7 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 		frmTempestSdr.setFocusable(true);
 		frmTempestSdr.setFocusableWindowState(true);
 		frmTempestSdr.addKeyListener(keyhook);
-		frmTempestSdr.setResizable(false);
+		frmTempestSdr.setResizable(true);
 		frmTempestSdr.setTitle("TempestSDR");
 		frmTempestSdr.setBounds(100, 100, 810, 750);
 		frmTempestSdr.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -250,6 +258,7 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 		line_plotter.setSelectedValue(height_initial);
 
 		spectrum_plotter = new PlotVisualizer(spectrum_transformer);
+		spectrum_plotter.setShowAxis(true);
 		spectrum_plotter.setBounds(10, 600, 727, 130);
 		frmTempestSdr.getContentPane().add(spectrum_plotter);
 
@@ -307,6 +316,15 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 		}
 		
 		mnFile.addSeparator();
+		
+		fullscreen_menuitem = new JCheckBoxMenuItem("Fullscreen (F11)");
+		fullscreen_menuitem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				toggleFullScreen();
+			}
+		});
+		mnFile.add(fullscreen_menuitem);
 		
 		JMenuItem exit = new JMenuItem("Exit");
 		exit.addActionListener(new ActionListener() {
@@ -684,6 +702,19 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 		
 		frmTempestSdr.setFocusableWindowState(true);
 		frmTempestSdr.requestFocus();
+
+		// scale the content when the window is resized or maximized
+		// (enables the native maximize button between minimize and close)
+		normalFrameBounds = frmTempestSdr.getBounds();
+		captureComponentBounds();
+		frmTempestSdr.addComponentListener(new ComponentAdapter() {
+			@Override
+			public void componentResized(ComponentEvent e) {
+				if (inFullscreen) return;
+				final Rectangle cur = frmTempestSdr.getBounds();
+				applyComponentScale(cur.getWidth() / normalFrameBounds.getWidth(), cur.getHeight() / normalFrameBounds.getHeight());
+			}
+		});
 		
 		onGainLevelChanged();
 		onMotionBlurLevelChanged();
@@ -947,9 +978,57 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 			visualizer.setOSD("Framerate: "+frameratetext+" fps", OSD_TIME);
 	}
 	
+	private void toggleFullScreen() {
+		if (inFullscreen) {
+			// leave fullscreen
+			frmTempestSdr.dispose();
+			frmTempestSdr.setUndecorated(false);
+			frmTempestSdr.setBounds(savedFrameBounds);
+			applyComponentScale(savedFrameBounds.getWidth() / normalFrameBounds.getWidth(), savedFrameBounds.getHeight() / normalFrameBounds.getHeight());
+			inFullscreen = false;
+			frmTempestSdr.setVisible(true);
+			frmTempestSdr.requestFocus();
+		} else {
+			// enter fullscreen
+			savedFrameBounds = frmTempestSdr.getBounds();
+			final Rectangle screen = frmTempestSdr.getGraphicsConfiguration().getBounds();
+			frmTempestSdr.dispose();
+			frmTempestSdr.setUndecorated(true);
+			frmTempestSdr.setBounds(screen);
+			applyComponentScale(screen.getWidth() / normalFrameBounds.getWidth(), screen.getHeight() / normalFrameBounds.getHeight());
+			inFullscreen = true;
+			frmTempestSdr.setVisible(true);
+			frmTempestSdr.requestFocus();
+		}
+		if (fullscreen_menuitem != null) fullscreen_menuitem.setSelected(inFullscreen);
+	}
+	
+	private void captureComponentBounds() {
+		savedComponentBounds.clear();
+		final Component[] comps = frmTempestSdr.getContentPane().getComponents();
+		for (int i = 0; i < comps.length; i++)
+			savedComponentBounds.put(comps[i], comps[i].getBounds());
+	}
+	
+	private void applyComponentScale(final double sx, final double sy) {
+		for (Map.Entry<Component, Rectangle> e : savedComponentBounds.entrySet()) {
+			final Rectangle b = e.getValue();
+			e.getKey().setBounds(
+					(int) Math.round(b.x * sx),
+					(int) Math.round(b.y * sy),
+					(int) Math.round(b.width * sx),
+					(int) Math.round(b.height * sy));
+		}
+	}
+	
 	private void onKeyboardKeyPressed(final KeyEvent e) {
 		final int keycode = e.getKeyCode();
 
+		if (keycode == KeyEvent.VK_F11)
+			toggleFullScreen();
+		else if (keycode == KeyEvent.VK_ESCAPE && inFullscreen)
+			toggleFullScreen();
+		
 		if (e.isShiftDown()) {
 			switch (keycode) {
 			case KeyEvent.VK_LEFT:
