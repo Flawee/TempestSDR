@@ -90,6 +90,7 @@ void tsdr_init(tsdr_lib_t ** tsdr, tsdr_value_changed_callback callback, tsdr_on
 
 	frameratedetector_init(&(*tsdr)->frameratedetect, *tsdr);
 	superb_init(&(*tsdr)->super);
+	spectral_init(&(*tsdr)->spectral);
 
 }
 
@@ -110,6 +111,7 @@ void tsdr_free(tsdr_lib_t ** tsdr) {
 
 	frameratedetector_free(&(*tsdr)->frameratedetect);
 	superb_free(&(*tsdr)->super);
+	spectral_free(&(*tsdr)->spectral);
 
 	free (*tsdr);
 	*tsdr = NULL;
@@ -124,12 +126,14 @@ void tsdr_reset(tsdr_lib_t * tsdr) {
 
 	frameratedetector_free(&tsdr->frameratedetect);
 	superb_free(&tsdr->super);
+	spectral_free(&tsdr->spectral);
 
 	dsp_post_process_init(&tsdr->dsp_postprocess);
 	dsp_resample_init(&tsdr->dsp_resample);
 
 	frameratedetector_init(&tsdr->frameratedetect, tsdr);
 	superb_init(&tsdr->super);
+	spectral_init(&tsdr->spectral);
 }
 
 
@@ -267,6 +271,8 @@ void process(float *buf, uint64_t items_count, void *ctx, int64_t samples_droppe
 	tsdr_context_t * context = (tsdr_context_t *) ctx;
 
 	const uint64_t size2 = items_count >> 1;
+
+	spectral_run(&context->this->spectral, buf, (int) size2, context->this->samplerate, context->this);
 
 	if (context->this->params_int[PARAM_AUTOCORR_SUPERRESOLUTION]) {
 		float * superbuf = NULL; int superbuff_samples;

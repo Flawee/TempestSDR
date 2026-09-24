@@ -120,7 +120,7 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 	private JButton btnStartStop;
 	private final TSDRLibrary mSdrlib;
 	private ImageVisualizer visualizer;
-	private PlotVisualizer line_plotter, frame_plotter;
+	private PlotVisualizer line_plotter, frame_plotter, spectrum_plotter;
 	private AutoScaleVisualizer autoScaleVisualizer;
 	//private SNRVisualizer snrLevelVisualizer; to enable snr start by uncommenting this
 	private Rectangle visualizer_bounds;
@@ -206,7 +206,7 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 		frmTempestSdr.addKeyListener(keyhook);
 		frmTempestSdr.setResizable(false);
 		frmTempestSdr.setTitle("TempestSDR");
-		frmTempestSdr.setBounds(100, 100, 810, 632);
+		frmTempestSdr.setBounds(100, 100, 810, 750);
 		frmTempestSdr.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmTempestSdr.addMouseListener(new MouseAdapter() {
 			@Override
@@ -248,6 +248,10 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 		line_plotter.setBounds(10, 498, 727, 95);
 		frmTempestSdr.getContentPane().add(line_plotter);
 		line_plotter.setSelectedValue(height_initial);
+
+		spectrum_plotter = new PlotVisualizer(spectrum_transformer);
+		spectrum_plotter.setBounds(10, 600, 727, 130);
+		frmTempestSdr.getContentPane().add(spectrum_plotter);
 
 		btnStartStop = new JButton("Start");
 		btnStartStop.setBounds(581, 33, 209, 25);
@@ -384,6 +388,14 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 			}
 		});
 		mnTweaks.add(chckbxmntmAutoCorrectAfterProc);
+		
+		final JCheckBoxMenuItem chckbxmntmSpectrumWindow = new JCheckBoxMenuItem("Spectrum window", true);
+		chckbxmntmSpectrumWindow.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				spectrum_plotter.setVisible(chckbxmntmSpectrumWindow.isSelected());
+			}
+		});
+		mnTweaks.add(chckbxmntmSpectrumWindow);
 		
 		btnReset = new JToggleButton("RST");
 		btnReset.addActionListener(new ActionListener() {
@@ -1270,6 +1282,10 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 				
 			}
 			break;
+		case SPECTRUM:
+			if (spectrum_plotter != null)
+				spectrum_plotter.plot(data, offset, size, samplerate);
+			break;
 		default:
 			System.out.println("Java Main received unimplemented notification plot value "+id+" with size "+size);
 			break;
@@ -1369,6 +1385,38 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 	}
 	
 	private final TransformerAndCallbackHeight height_transformer = new TransformerAndCallbackHeight();
+	
+	private long getCurrentBaseFreq() {
+		final Object value = spFrequency.getValue();
+		return (value instanceof Long) ? ((Long) value) : 0L;
+	}
+	
+	private final TransformerAndCallback spectrum_transformer = new TransformerAndCallback() {
+		
+		@Override
+		public String getDescription(final double val, final int id) { return String.format("%.3f MHz", val); }
+		
+		@Override
+		public double fromIndex(int id, int offset, long samplerate) {
+			final int fftsize = (offset > 0) ? offset : 1;
+			return (getCurrentBaseFreq() + (id - fftsize / 2.0) * samplerate / fftsize) / 1e6;
+		}
+		
+		@Override
+		public int toIndex(double val, int offset, long samplerate) {
+			final int fftsize = (offset > 0) ? offset : 1;
+			return roundData((val * 1e6 - getCurrentBaseFreq()) / samplerate * fftsize + fftsize / 2.0);
+		}
+		
+		@Override
+		public void executeIdSelected(int sel_id, int offset, long samplerate) {
+			if (sel_id < 0) return;
+			final long newfreq = Math.round(fromIndex(sel_id, offset, samplerate) * 1e6);
+			if (newfreq < 0) return;
+			spFrequency.setValue(newfreq);
+		}
+	};
+	
 	private JCheckBoxMenuItem chckbxmntmHighQualityRendering;
 	private JCheckBoxMenuItem chckbxmntmLowpassBeforeSync;
 	private JCheckBoxMenuItem chckbxmntmAutoCorrectAfterProc;

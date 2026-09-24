@@ -51,6 +51,7 @@
 
 	#define PLOT_ID_FRAME (0)
 	#define PLOT_ID_LINE (1)
+	#define PLOT_ID_SPECTRUM (2)
 
 	typedef struct tsdr_lib tsdr_lib_t;
 

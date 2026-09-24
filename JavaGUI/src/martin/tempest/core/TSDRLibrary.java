@@ -413,7 +413,7 @@ public class TSDRLibrary {
 	
 	public interface IncomingValueCallback {
 		public static enum VALUE_ID {PLL_FRAMERATE, AUTOCORRECT_RESET, FRAMES_COUNT, AUTOGAIN, SNR, AUTOCORRECT_DUMPED};
-		public static enum PLOT_ID {FRAME, LINE};
+		public static enum PLOT_ID {FRAME, LINE, SPECTRUM};
 		
 		public void onValueChanged(final VALUE_ID id, double arg0, double arg1);
 		public void onIncommingPlot(final PLOT_ID id, int offset, double[] data, int size, long samplerate);

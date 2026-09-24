@@ -19,6 +19,7 @@
 
 #include "extbuffer.h"
 #include "dsp.h"
+#include "spectrum.h"
 
 #include "include/TSDRLibrary.h"
 
@@ -52,6 +53,8 @@
 		double params_double[COUNT_PARAM_DOUBLE];
 
 		frameratedetector_t frameratedetect;
+
+		spectral_t spectral;
 
 		tsdr_value_changed_callback callback;
 		tsdr_on_plot_ready_callback plotready_callback;
