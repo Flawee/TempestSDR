@@ -86,7 +86,9 @@ PLUGINS=TSDRPlugin_RawFile
 
 ifeq ($(OSNAME),WINDOWS)
 # Windows only plugins
-PLUGINS += TSDRPlugin_SDRPlay TSDRPlugin_ExtIO
+#PLUGINS += TSDRPlugin_SDRPlay TSDRPlugin_ExtIO
+PLUGINS += TSDRPlugin_ExtIO
+
 else ifeq ($(OSNAME), LINUX)
 PLUGINS += TSDRPlugin_UHD
 else ifeq ($(OSNAME), MAC)
