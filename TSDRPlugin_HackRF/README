@@ -1,0 +1,77 @@
+TSDRPlugin_HackRF - HackRF One support for TempestSDR
+=====================================================
+
+This plugin gives TempestSDR access to the HackRF One (including a HackRF One
+with a PortaPack attached, rebooted into "HackRF mode") via libhackrf
+(hackrf.dll on Windows). It supports:
+
+  * HackRF One (and HackRF Jawbreaker)
+  * HackRF modes 2 (R9/full-duplex) and 6 (R8, single RX - the HackRF One)
+  * macOS / Linux (via the system libhackrf library)
+
+The capture is fixed to 8 MHz sample rate (matching the other TempestSDR
+plugins); the centre frequency and gain are controlled from the main GUI in
+the usual way.
+
+PortaPack note
+--------------
+
+With a PortaPack board attached and running its own firmware, the device
+enumerates as a PortaPack (CDC serial port) and is NOT visible to the plugin.
+Before using TempestSDR with such a device, reboot it into HackRF mode: on the
+PortaPack (Mayhem) firmware go to Settings/Setup -> "HackRF mode" -> enable and
+reboot, or hold the rotary knob while powering on. The device will then show up
+as a plain "HackRF One" (USB VID 1d50, PID 6089). To get back to PortaPack,
+hold the knob while plugging it in again. A stock HackRF One without a
+PortaPack needs no special handling.
+
+Driver note (Windows)
+---------------------
+
+HackRF One normally uses Windows' built-in WinUSB driver (WCID) automatically
+on Windows 10/11. If the device is not recognised, install/attach the WinUSB
+driver with Zadig (https://zadig.akeo.ie): Options -> "List All Devices",
+select "HackRF One" and press "Replace Driver" (or "Install Driver").
+
+Building
+--------
+
+No Great Scott Gadgets SDK is required to build this plugin. On Windows the
+API is loaded dynamically at runtime from hackrf.dll, so the plugin links
+against nothing but the standard Windows system libraries. The matching
+libhackrf ABI declarations are mirrored inside src/TSDRPlugin_HackRF.c
+(libhackrf 2026.01.x). On Linux/macOS the plugin links against -lhackrf.
+
+On Windows, build together with the Java GUI (from JavaGUI/):
+
+    make all ARCHNAME=X64
+
+The resulting TSDRPlugin_HackRF.dll is copied to JavaGUI/lib/WINDOWS/X64.
+
+Runtime requirements (Windows)
+-----------------------------
+
+The plugin loads hackrf.dll (libhackrf, 64-bit, with libusb statically linked)
+at runtime. The Java GUI packages hackrf.dll inside JTempestSDR.jar and, when
+the "HackRF One" source is loaded, extracts it automatically into the same
+temporary folder that holds TSDRPlugin_HackRF.dll (the Windows %TEMP% folder).
+No manual copy is needed when launching the GUI from the jar, no matter which
+folder it is launched from.
+
+If for any reason the DLL is not found, the plugin checks, in order:
+
+  1. the standard Windows library search path (the java.exe folder, System32,
+     the current directory i.e. where TempestSDR was launched from, PATH),
+  2. the folder that contains TSDRPlugin_HackRF.dll itself (i.e. %TEMP% when
+     launched from the jar), and
+  3. the folder named by the %TEMP% environment variable.
+
+Manual placement only becomes necessary when running from class files without
+the jar (development builds); in that case copy hackrf.dll (x64, same build as
+the plugin) next to TSDRPlugin_HackRF.dll, into the launch folder, or into
+System32.
+
+The x64 hackrf.dll used for this build (libhackrf 2026.01.3, built with
+MinGW-w64, libusb 1.0.27) is self-contained - it needs no other DLLs. If
+hackrf.dll can not be found, loading the plugin fails with a clear message
+pointing to this file.

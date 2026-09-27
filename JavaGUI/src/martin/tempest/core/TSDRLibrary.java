@@ -19,7 +19,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import martin.tempest.core.exceptions.TSDRAlreadyRunningException;
 import martin.tempest.core.exceptions.TSDRException;
@@ -37,6 +39,20 @@ import martin.tempest.sources.TSDRSource;
  */
 public class TSDRLibrary {
 	private final static ArrayList<String> files_to_delete_on_shutdown = new ArrayList<String>();
+	
+	/**
+	 * Some plugins load support DLLs at runtime (hackrf.dll for the HackRF
+	 * One plugin, mir_sdr_api.dll for the SDRplay one). These live next to the
+	 * plugin in the jar's lib/OS/ARCH folder but are not extracted with it, so
+	 * pull them into the same temporary folder that holds the plugin; the
+	 * plugins know how to find them there. This keeps the plugin working no
+	 * matter which folder TempestSDR is launched from.
+	 */
+	private static final Map<String, String[]> PLUGIN_COMPANION_LIBRARIES = new HashMap<String, String[]>();
+	static {
+		PLUGIN_COMPANION_LIBRARIES.put("TSDRPlugin_HackRF", new String[] { "hackrf" });
+		PLUGIN_COMPANION_LIBRARIES.put("TSDRPlugin_SDRPlay", new String[] { "mir_sdr_api" });
+	}
 	
 	/** The image that will be have its pixels written by the NDK */
 	private BufferedImage bimage;
@@ -272,7 +288,27 @@ public class TSDRLibrary {
 	 * @throws TSDRException
 	 */
 	public void loadPlugin(final TSDRSource plugin) throws TSDRException {
+		extractPluginCompanionLibraries(plugin);
 		loadPlugin(plugin.getAbsolutePathToLibrary(), plugin.getParams());
+	}
+	
+	/**
+	 * Best-effort extraction of the support DLLs that {@code plugin} may load
+	 * at runtime (see {@link #PLUGIN_COMPANION_LIBRARIES}) into the same
+	 * temporary folder that holds the plugin itself. Failing to extract a
+	 * companion library is not fatal - the plugin still tries its own search
+	 * (launch folder, System32, PATH, ...).
+	 */
+	private static final void extractPluginCompanionLibraries(final TSDRSource plugin) {
+		final String[] companions = PLUGIN_COMPANION_LIBRARIES.get(plugin.libname);
+		if (companions == null) return;
+		for (final String companion : companions) {
+			try {
+				extractLibrary(companion);
+			} catch (TSDRLibraryNotCompatible e) {
+				/* not shipped for this OS/architecture - nothing to do */
+			}
+		}
 	}
 	
 	/**
