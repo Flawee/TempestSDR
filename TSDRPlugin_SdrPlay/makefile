@@ -92,9 +92,9 @@ ifeq ($(OSNAME),WINDOWS)
 	LDFLAGS+=-Wl,--add-stdcall-alias
 	EXT=.dll
 	LIBPREFIX=
-	SDRPLAY_HOME?=C:/PROGRA~1/SDRplay
-	INC += "$(SDRPLAY_HOME)/API/inc"
-	LIBRARIES=-L"$(SDRPLAY_HOME)/API/$(ARCHNAME_LOWER)/" -lmir_sdr_api
+	# The legacy SDRplay "Mirics" API (mir_sdr_api.dll, v2.13) is loaded at runtime
+	# by TSDRPlugin_SDRPlay.c, so this plugin builds without the SDRplay SDK.
+	# The matching header is vendored in src/mir_sdr.h. No link-time dependency.
 else ifeq ($(OSNAME),MAC)
 	EXT ?= .so
 	CXXFLAGS+=-fPIC

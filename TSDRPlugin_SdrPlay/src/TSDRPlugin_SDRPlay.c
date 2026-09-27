@@ -24,6 +24,80 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__) || defined(__CYGWIN__)
+/* The legacy SDRplay RSP1/RSP2 "Mirics" API (mir_sdr_api.dll, v2.13) is loaded
+ * dynamically so that the plugin builds without the SDRplay SDK and reports a
+ * clear error when the API DLL is missing at runtime. The matching header is
+ * vendored in src/mir_sdr.h and every mir_sdr_* call below is routed through
+ * these function pointers. */
+static HMODULE mir_sdr_handle = NULL;
+static mir_sdr_Init_t                 API_mir_sdr_Init;
+static mir_sdr_Uninit_t               API_mir_sdr_Uninit;
+static mir_sdr_ReadPacket_t           API_mir_sdr_ReadPacket;
+static mir_sdr_SetRf_t                API_mir_sdr_SetRf;
+static mir_sdr_AgcControl_t           API_mir_sdr_AgcControl;
+static mir_sdr_RSP_SetGr_t            API_mir_sdr_RSP_SetGr;
+static mir_sdr_RSPII_AntennaControl_t API_mir_sdr_RSPII_AntennaControl;
+static mir_sdr_GetDevices_t           API_mir_sdr_GetDevices;
+
+#define MIR_SDR_LOAD(fn) do { \
+	API_mir_sdr_##fn = (mir_sdr_##fn##_t) GetProcAddress(mir_sdr_handle, "mir_sdr_" #fn); \
+	if (API_mir_sdr_##fn == NULL) { \
+		FreeLibrary(mir_sdr_handle); \
+		mir_sdr_handle = NULL; \
+		return 0; \
+	} \
+} while (0)
+
+static int load_mir_sdr_api(void) {
+	if (mir_sdr_handle != NULL) return 1;
+
+	/* Standard search path first: the executable's folder, the current directory,
+	 * System32 (where the legacy SDRplay RSP driver installs the API), ... */
+	mir_sdr_handle = LoadLibraryA("mir_sdr_api.dll");
+	if (mir_sdr_handle == NULL) {
+		/* Then look in the folder that holds this plugin DLL. */
+		HMODULE self = GetModuleHandleA("TSDRPlugin_SDRPlay.dll");
+		if (self != NULL) {
+			char plugindir[MAX_PATH];
+			const DWORD len = GetModuleFileNameA(self, plugindir, MAX_PATH);
+			if (len > 0 && len < MAX_PATH) {
+				char * slash = strrchr(plugindir, '\\');
+				if (slash == NULL) slash = strrchr(plugindir, '/');
+				if (slash != NULL) {
+					*slash = '\0';
+					strcat(plugindir, "\\mir_sdr_api.dll");
+					mir_sdr_handle = LoadLibraryA(plugindir);
+				}
+			}
+		}
+	}
+	if (mir_sdr_handle == NULL) return 0;
+
+	MIR_SDR_LOAD(Init);
+	MIR_SDR_LOAD(Uninit);
+	MIR_SDR_LOAD(ReadPacket);
+	MIR_SDR_LOAD(SetRf);
+	MIR_SDR_LOAD(AgcControl);
+	MIR_SDR_LOAD(RSP_SetGr);
+	MIR_SDR_LOAD(RSPII_AntennaControl);
+	MIR_SDR_LOAD(GetDevices);
+
+	return 1;
+}
+#undef MIR_SDR_LOAD
+
+/* Route the mir_sdr_* calls (otherwise statically linked) through the runtime API. */
+#define mir_sdr_Init                 API_mir_sdr_Init
+#define mir_sdr_Uninit               API_mir_sdr_Uninit
+#define mir_sdr_ReadPacket           API_mir_sdr_ReadPacket
+#define mir_sdr_SetRf                API_mir_sdr_SetRf
+#define mir_sdr_AgcControl           API_mir_sdr_AgcControl
+#define mir_sdr_RSP_SetGr            API_mir_sdr_RSP_SetGr
+#define mir_sdr_RSPII_AntennaControl API_mir_sdr_RSPII_AntennaControl
+#define mir_sdr_GetDevices           API_mir_sdr_GetDevices
+#endif
+
 #define SAMPLE_RATE (8000000)
 
 volatile int working = 0;
@@ -91,6 +165,12 @@ int TSDRPLUGIN_API __stdcall tsdrplugin_setgain(float gain) {
 }
 
 int TSDRPLUGIN_API __stdcall tsdrplugin_init(const char * params) {
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__) || defined(__CYGWIN__)
+	if (!load_mir_sdr_api())
+		RETURN_EXCEPTION(
+			"The SDRplay API (mir_sdr_api.dll, v2.13) was not found. Install the legacy SDRplay RSP1/RSP2 driver (it puts mir_sdr_api.dll into System32), or copy mir_sdr_api.dll (64-bit) into the folder you launch TempestSDR from, then try again. See TSDRPlugin_SdrPlay/README for details.",
+			TSDR_INCOMPATIBLE_PLUGIN);
+#endif
 	RETURN_OK();
 }
 
@@ -201,5 +281,10 @@ int TSDRPLUGIN_API __stdcall tsdrplugin_readasync(tsdrplugin_readasync_function 
 }
 
 void TSDRPLUGIN_API __stdcall tsdrplugin_cleanup(void) {
-
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__) || defined(__CYGWIN__)
+	if (mir_sdr_handle != NULL) {
+		FreeLibrary(mir_sdr_handle);
+		mir_sdr_handle = NULL;
+	}
+#endif
 }

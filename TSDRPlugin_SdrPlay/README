@@ -1,3 +1,50 @@
-This is a driver for SDRplay for Mac. You first need to install the SDR driver from https://www.sdrplay.com/
+TSDRPlugin_SDRPlay - SDRplay RSP support for TempestSDR
+=======================================================
 
-This driver can probably be adopted to work on Linux and Windows. I'm happy to accept pull requests.
+This plugin gives TempestSDR access to SDRplay RSP receivers through the
+legacy SDRplay "Mirics" API (mir_sdr_api.dll v2.13). It supports:
+
+  * RSP1 (original)
+  * early RSP2 / "RSPII" development hardware
+  * macOS (via the mirsdrapi-rsp library)
+
+Modern SDRplay receivers (RSP1A, RSPdx, RSPduo, ...) use the newer
+sdrplay_api and are NOT supported by this plugin. For those, use the
+TSDRPlugin_ExtIO plugin together with SDRplay's ExtIO_RSP.dll instead.
+
+Building
+--------
+
+No SDRplay SDK is required to build this plugin. The matching API header
+(src/mir_sdr.h, Mirics API v2.13) is vendored in the repository and the API
+is loaded dynamically at runtime, so the plugin links against nothing but the
+standard Windows/macOS system libraries.
+
+On Windows, build together with the Java GUI (from JavaGUI/):
+
+    make all ARCHNAME=X64
+
+The resulting TSDRPlugin_SDRPlay.dll is copied to JavaGUI/lib/WINDOWS/X64.
+
+Runtime requirements (Windows)
+-----------------------------
+
+The plugin loads mir_sdr_api.dll (legacy v2.13) at runtime. It is searched:
+
+  1. on the standard Windows library search path (System32 is the default
+     location used by the SDRplay RSP1/RSP2 driver installer; the current
+     directory, i.e. the folder you launch TempestSDR from, is also searched),
+     and
+  2. in the folder that contains TSDRPlugin_SDRPlay.dll itself.
+
+So either:
+
+  * install the SDRplay RSP1/RSP2 driver package (which puts the API into
+    System32), or
+  * copy mir_sdr_api.dll (v2.13, 64-bit for an X64 build) into the folder you
+    launch TempestSDR from (e.g. JavaGUI/, next to JTempestSDR.jar), or into
+    the folder that contains TSDRPlugin_SDRPlay.dll.
+
+The driver can be obtained from the SDRplay website (https://www.sdrplay.com/)
+- legacy RSP1 API section. If mir_sdr_api.dll can not be found, loading the
+plugin fails with a clear message pointing to this file.
