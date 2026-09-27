@@ -36,7 +36,7 @@ public class AutoScaleVisualizer extends JPanel {
 	private boolean font_set = false;
 	private Font font;
 	
-	private final static Color background = new Color(150, 170, 130);
+	private final static Color background = new Color(45, 48, 50); // dark theme (FlatLaf Darcula control color)
 	private final static Color default_txt_colour_background = Color.DARK_GRAY;
 	
 	private static final Color colour_map[] = new Color[256];
@@ -124,7 +124,7 @@ public class AutoScaleVisualizer extends JPanel {
 			
 			if (this.max >= scale_y.getLowestValue() && this.max <= scale_y.getHighestValue()) {
 				final double max_db = scale_y.valtodb(this.max);
-				g.setColor(Color.DARK_GRAY);
+				g.setColor(Color.lightGray);
 				g.drawString(String.format("%.1f", max_db), 0, maxpx + fontsize);
 			}
 

@@ -86,7 +86,7 @@ PLUGINS=TSDRPlugin_RawFile
 
 ifeq ($(OSNAME),WINDOWS)
 # Windows only plugins
-#PLUGINS += TSDRPlugin_SDRPlay TSDRPlugin_ExtIO
+#PLUGINS += TSDRPlugin_SDRPlay TSDRPlugin_ExtIO TSDRPlugin_HackRF
 PLUGINS += TSDRPlugin_ExtIO
 
 else ifeq ($(OSNAME), LINUX)
@@ -109,6 +109,16 @@ CLASSFILES:=$(patsubst %,bin/%,$(addsuffix .class,$(basename $(foreach jfile,$(J
 # The folder that will contain the libraries
 OUTPUTFOLDER=lib/$(OSNAME)/$(ARCHNAME)
 
+# Java libraries needed besides the sources (FlatLaf modern flat themes)
+# FlatLaf classes are extracted into bin/ (extractlibs) and used from there,
+# so the class path only contains plain directories, never modular jars.
+# The class path separator is OS dependent
+ifeq ($(OSNAME),WINDOWS)
+JAVACLASSPATH=src/;bin/
+else
+JAVACLASSPATH=src/:bin/
+endif
+
 # Build the file names of the plugin files
 PLUGINS_FILES=$(addprefix $(LIBPREFIX),$(addsuffix $(EXT),$(PLUGINS)))
 
@@ -125,10 +135,18 @@ debugjnilib : jnilib
 
 # When compiling from command line with all
 # make sure we compile both jni and java files
-all : jnilib jar
+all : jnilib extractlibs java jar
+
+# Extract the bundled third party libraries (FlatLaf) into bin/.
+# Classes on the compiler class path cause JDK module errors when the jar
+# contains a module-info.class (java.sql usage in ImageVisualizer), so we
+# compile against the extracted plain classes instead of the jar.
+extractlibs :
+	mkdir -p bin # Create the bin directory if it doesn't exist (if you downloaded it from github)
+	cd bin && jar xf ../ext/flatlaf.jar && rm -rf META-INF module-info.class
 
 # Package compiled files into a runnable jar
-jar : java
+jar : extractlibs java
 	jar cvfe JTempestSDR.jar martin.tempest.gui.Main lib -C bin .
 
 # The compilation of the java classes from command line
@@ -138,8 +156,7 @@ java : $(CLASSFILES)
 # For each class file, invoke javac with the source file which is constructed
 # from the name of the class file
 %.class : $(JAVAFILES)
-	mkdir -p bin # Create the bin directory if it doesn't exist (if you downloaded it from github)
-	javac $(patsubst %,src/%, $(subst bin/,,$(@:.class=.java))) -d bin/ -cp src/
+	javac $(patsubst %,src/%, $(subst bin/,,$(@:.class=.java))) -d bin/ -cp "$(JAVACLASSPATH)"
 
 # Invoke the makefile for the jni stuff
 jnilib : plugins

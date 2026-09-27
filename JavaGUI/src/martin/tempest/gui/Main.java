@@ -11,6 +11,8 @@
 package martin.tempest.gui;
 
 import java.awt.Component;
+import java.awt.Color;
+import java.awt.Font;
 import java.awt.EventQueue;
 import java.awt.Graphics2D;
 import java.awt.Insets;
@@ -25,6 +27,7 @@ import javax.swing.JComboBox;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.UIManager;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerModel;
 import javax.swing.SpinnerNumberModel;
@@ -167,6 +170,7 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 	 * Launch the application.
 	 */
 	public static void main(String[] args) {
+		setupLookAndFeel();
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
@@ -177,6 +181,29 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 				}
 			}
 		});
+	}
+	
+	/**
+	 * Applies the modern flat dark theme (FlatLaf) before any window is created.
+	 * Falls back to the OS look and feel if FlatLaf is not available.
+	 */
+	private static void setupLookAndFeel() {
+		try {
+			Class.forName("com.formdev.flatlaf.FlatDarculaLaf");
+			com.formdev.flatlaf.FlatDarculaLaf.setup();
+			
+			UIManager.put("defaultFont", new Font("Segoe UI", Font.PLAIN, 12));
+			
+			// subtle teal accent for focus, selection and spinner buttons
+			final Color accent = new Color(0x26, 0xC6, 0xDA);
+			UIManager.put("Component.focusColor", accent);
+			UIManager.put("Component.accentColor", accent);
+		} catch (Throwable t) {
+			// FlatLaf not available - fall back to the OS look and feel
+			try {
+				UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+			} catch (Exception e) {}
+		}
 	}
 
 	private static void displayException(final Component panel, final Throwable t) {
@@ -295,7 +322,7 @@ public class Main implements TSDRLibrary.FrameReadyCallback, TSDRLibrary.Incomin
 		frame_plotter.setSelectedValue(framerate);
 		
 		menuBar = new JMenuBar();
-		menuBar.setBounds(0, 0, 825, 21);
+		menuBar.setBounds(0, 0, 825, 24);
 		frmTempestSdr.getContentPane().add(menuBar);
 		
 		JMenu mnFile = new JMenu("File");
